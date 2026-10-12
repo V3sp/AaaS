@@ -2,8 +2,8 @@
  * Architect as a Service — domain logic.
  *
  * The business rule: every question is answered with a classic architect
- * non-answer. There are ten archetypes; each has a blunt "base" phrasing and a
- * more cynical "variant" that shows up less often. The canonical "To zależy"
+ * non-answer. There are eleven archetypes; each has a blunt "base" phrasing and
+ * a more cynical "variant" that shows up less often. The canonical "To zależy"
  * archetype carries extra weight so the product still feels like itself.
  *
  * No database. No persistence. Pure function over the incoming question.
@@ -21,7 +21,8 @@ export type AnswerKind =
   | 'nfr'
   | 'slo'
   | 'workshop'
-  | 'spike';
+  | 'spike'
+  | 'monologue';
 
 export interface LanguageMeta {
   code: Language;
@@ -76,6 +77,7 @@ const KIND_LABELS: Record<AnswerKind, string> = {
   slo: 'Reliability Definition',
   workshop: 'Process Escalation',
   spike: 'Discovery Required',
+  monologue: 'Comprehensive Analysis',
 };
 
 const MODELS = [
@@ -96,7 +98,190 @@ const KIND_WEIGHTS: ReadonlyArray<readonly [AnswerKind, number]> = [
   ['slo', 1],
   ['workshop', 1],
   ['spike', 1],
+  ['monologue', 1],
 ];
+
+/** Closing line of the monologue: the pivot back to the actual question. */
+const ASK_BACK: Record<Language, string> = {
+  pl: 'A właściwie o co mnie pytałeś?',
+  en: 'But what were you actually asking me?',
+  de: 'Aber was hast du mich eigentlich gefragt?',
+  ja: 'でも、結局何を聞きたかったんですか？',
+};
+
+/** Extra cynical sentence appended only in the variant phrasing. */
+const MONOLOGUE_CODA: Record<Language, string> = {
+  pl: 'A i tak nikt tego nie przeczyta do końca. ',
+  en: 'And nobody will read it to the end anyway. ',
+  de: 'Und trotzdem wird das niemand bis zum Ende lesen. ',
+  ja: 'それでも誰も最後まで読まないんですけどね。 ',
+};
+
+/**
+ * The "you ask me the time and I tell you the history of clocks" answer:
+ * a very long, jargon-dense architectural monologue that never gets to the point,
+ * ending with the question thrown back.
+ */
+const MONOLOGUE_BODY: Record<Language, string> = {
+  pl:
+    'Zanim odpowiem, musimy wpierw ustalić wspólny język, bo architektura to nie projekt, ' +
+    'lecz zbiór decyzji i ich konsekwencji, a każda z nich ma swoją historię. ' +
+    'Zacznijmy od tego, że cała ta dyskusja jest tak naprawdę o granicach: o bounded contextach, ' +
+    'aggregate roots, context mapach i ubiquitous language, bo bez nich każde zdanie znaczy coś innego ' +
+    'dla biznesu, coś innego dla developera, a jeszcze coś innego dla audytu. ' +
+    'Idąc dalej, warstwowość — hexagonal, onion, clean, ports and adapters, dependency inversion, ' +
+    'separation of concerns, cohesion i coupling — prowadzi nas prosto do decyzji o stylu integracji: ' +
+    'monolit modularny, SOA, mikroserwisy, serverless, a może modulith, strangler fig wobec legacy ' +
+    'i anti-corruption layer na styku z systemem zewnętrznym. ' +
+    'Dalej przepływy: synchroniczne REST i gRPC kontra asynchroniczne eventy, choreografia kontra ' +
+    'orkiestracja, saga, outbox, inbox, idempotentność, exactly-once, at-least-once, poison message, ' +
+    'dead letter queue, back-pressure, circuit breaker, bulkhead, retry z exponential backoff i jitter, ' +
+    'rate limiting oraz token bucket. ' +
+    'Nad tym wszystkim wisi CAP i PACELC: consistency, availability, partition tolerance i latency, ' +
+    'a obok ACID kontra BASE, eventual consistency, read-your-writes, CQRS po stronie odczytu, ' +
+    'event sourcing jako źródło prawdy, snapshoty i projekcje. ' +
+    'Nie zapominajmy o danych: data mesh, data fabric, lakehouse, medallion architecture, lambda ' +
+    'i kappa, golden source, system of record, master data management, data lineage, data contracts, ' +
+    'schema registry i backfilling. ' +
+    'Do tego platforma: twelve-factor, konteneryzacja, Kubernetes, operatory, service mesh, Istio, ' +
+    'Envoy, sidecar, API gateway, BFF, service discovery, platform engineering, internal developer ' +
+    'platform, GitOps, IaC, Terraform, Pulumi, golden paths, service catalog, Backstage i FinOps. ' +
+    'A do tego jakość i ryzyko: SOLID, DRY, KISS, YAGNI, fitness functions, evolutionary ' +
+    'architecture, architecture decision records, technical debt quadrant, test pyramid, contract ' +
+    'testing, chaos engineering, observability jako metryki, logi i tracy, OpenTelemetry, golden ' +
+    'signals, RED i USE, DORA, SLI, SLO, SLA, error budget i burn rate. ' +
+    'Na koniec ludzie: prawo Conwaya, Team Topologies, zespoły stream-aligned, platform, enabling ' +
+    'i complicated-subsystem, cognitive load, Dunbar, Wardley mapping, Cynefin, OODA, VUCA ' +
+    'i podejmowanie decyzji w warunkach niepewności. ' +
+    'Oraz governance: TOGAF, Zachman, ArchiMate, DoDAF, FEAF, C4, model 4+1, capability map, roadmapa, ' +
+    'portfolio, zero trust, defence in depth, least privilege, STRIDE, shift-left, SBOM ' +
+    'i bezpieczeństwo łańcucha dostaw. ',
+  en:
+    'Before I answer, we first need to establish a shared language, because architecture is not a ' +
+    'project but a set of decisions and their consequences, and every one of them has a history. ' +
+    "Let's start from the fact that this whole discussion is really about boundaries: bounded " +
+    'contexts, aggregate roots, context maps and ubiquitous language, because without them every ' +
+    'sentence means one thing to the business, another to the developer, and something else entirely ' +
+    'to audit. ' +
+    'Moving on, layering — hexagonal, onion, clean, ports and adapters, dependency inversion, ' +
+    'separation of concerns, cohesion and coupling — leads us straight to the integration-style ' +
+    'decision: modular monolith, SOA, microservices, serverless, or maybe a modulith, plus a ' +
+    'strangler fig around the legacy and an anti-corruption layer at the edge of the external ' +
+    'system. ' +
+    'Then flows: synchronous REST and gRPC versus asynchronous events, choreography versus ' +
+    'orchestration, saga, outbox, inbox, idempotency, exactly-once, at-least-once, poison messages, ' +
+    'dead letter queues, back-pressure, circuit breakers, bulkheads, retry with exponential backoff ' +
+    'and jitter, rate limiting and token buckets. ' +
+    'Hovering over all of it are CAP and PACELC: consistency, availability, partition tolerance and ' +
+    'latency, alongside ACID versus BASE, eventual consistency, read-your-writes, read-side CQRS, ' +
+    'event sourcing as the source of truth, snapshots and projections. ' +
+    "Let's not forget the data: data mesh, data fabric, lakehouse, medallion architecture, lambda " +
+    'and kappa, golden source, system of record, master data management, data lineage, data ' +
+    'contracts, schema registry and backfilling. ' +
+    'Then the platform: twelve-factor, containerization, Kubernetes, operators, service mesh, Istio, ' +
+    'Envoy, sidecars, API gateway, BFF, service discovery, platform engineering, internal developer ' +
+    'platform, GitOps, IaC, Terraform, Pulumi, golden paths, service catalog, Backstage and FinOps. ' +
+    'And then quality and risk: SOLID, DRY, KISS, YAGNI, fitness functions, evolutionary ' +
+    'architecture, architecture decision records, the technical debt quadrant, the test pyramid, ' +
+    'contract testing, chaos engineering, observability as metrics, logs and traces, OpenTelemetry, ' +
+    'golden signals, RED and USE, DORA, SLI, SLO, SLA, error budget and burn rate. ' +
+    "Then people: Conway's law, Team Topologies, stream-aligned, platform, enabling and " +
+    'complicated-subsystem teams, cognitive load, Dunbar, Wardley mapping, Cynefin, OODA, VUCA and ' +
+    'decision-making under uncertainty. ' +
+    'And governance: TOGAF, Zachman, ArchiMate, DoDAF, FEAF, C4, the 4+1 model, capability maps, ' +
+    'roadmaps, portfolio, zero trust, defence in depth, least privilege, STRIDE, shift-left, SBOM ' +
+    'and supply chain security. ',
+  de:
+    'Bevor ich antworte, müssen wir zunächst eine gemeinsame Sprache finden, denn Architektur ist ' +
+    'kein Projekt, sondern eine Menge von Entscheidungen und ihren Konsequenzen, und jede davon hat ' +
+    'ihre Geschichte. ' +
+    'Fangen wir damit an, dass es in dieser ganzen Diskussion eigentlich um Grenzen geht: Bounded ' +
+    'Contexts, Aggregate Roots, Context Maps und Ubiquitous Language, denn ohne sie bedeutet jeder ' +
+    'Satz für das Business etwas anderes, für die Entwickler etwas anderes und für das Audit noch ' +
+    'etwas ganz anderes. ' +
+    'Weiter geht es mit der Schichtung — Hexagonal, Onion, Clean, Ports and Adapters, Dependency ' +
+    'Inversion, Separation of Concerns, Cohesion und Coupling — und das führt uns direkt zur ' +
+    'Entscheidung über den Integrationsstil: modulares Monolith, SOA, Microservices, Serverless oder ' +
+    'vielleicht ein Modulith, dazu eine Strangler-Fig um das Legacy-System und eine ' +
+    'Anti-Corruption-Layer an der Grenze zum externen System. ' +
+    'Dann die Flüsse: synchrones REST und gRPC versus asynchrone Events, Choreografie versus ' +
+    'Orchestrierung, Saga, Outbox, Inbox, Idempotenz, Exactly-once, At-least-once, Poison Messages, ' +
+    'Dead Letter Queues, Back-Pressure, Circuit Breaker, Bulkheads, Retry mit exponentiellem Backoff ' +
+    'und Jitter, Rate Limiting und Token Bucket. ' +
+    'Über allem schweben CAP und PACELC: Consistency, Availability, Partition Tolerance und ' +
+    'Latency, daneben ACID versus BASE, Eventual Consistency, Read-your-writes, CQRS auf der ' +
+    'Leseseite, Event Sourcing als Source of Truth, Snapshots und Projektionen. ' +
+    'Vergessen wir die Daten nicht: Data Mesh, Data Fabric, Lakehouse, Medallion Architecture, ' +
+    'Lambda und Kappa, Golden Source, System of Record, Master Data Management, Data Lineage, Data ' +
+    'Contracts, Schema Registry und Backfilling. ' +
+    'Dazu die Plattform: Twelve-Factor, Containerisierung, Kubernetes, Operatoren, Service Mesh, ' +
+    'Istio, Envoy, Sidecars, API Gateway, BFF, Service Discovery, Platform Engineering, Internal ' +
+    'Developer Platform, GitOps, IaC, Terraform, Pulumi, Golden Paths, Service Catalog, Backstage ' +
+    'und FinOps. ' +
+    'Und dann Qualität und Risiko: SOLID, DRY, KISS, YAGNI, Fitness Functions, Evolutionary ' +
+    'Architecture, Architecture Decision Records, Technical Debt Quadrant, Testpyramide, Contract ' +
+    'Testing, Chaos Engineering, Observability als Metriken, Logs und Traces, OpenTelemetry, Golden ' +
+    'Signals, RED und USE, DORA, SLI, SLO, SLA, Error Budget und Burn Rate. ' +
+    'Dann die Menschen: Conways Gesetz, Team Topologies, stream-aligned, platform, enabling und ' +
+    'complicated-subsystem Teams, Cognitive Load, Dunbar, Wardley Mapping, Cynefin, OODA, VUCA und ' +
+    'Entscheidungsfindung unter Unsicherheit. ' +
+    'Und Governance: TOGAF, Zachman, ArchiMate, DoDAF, FEAF, C4, das 4+1-Modell, Capability Maps, ' +
+    'Roadmaps, Portfolio, Zero Trust, Defence in Depth, Least Privilege, STRIDE, Shift-Left, SBOM ' +
+    'und Supply-Chain-Security. ',
+  ja:
+    '答える前に、まず共通言語を確立する必要があります。なぜならアーキテクチャはプロジェクトではなく、' +
+    '意思決定とその結果の集合であり、その一つひとつに歴史があるからです。' +
+    'まず、この議論は本質的に境界の話です。境界づけられたコンテキスト、集約ルート、コンテキストマップ、' +
+    'ユビキタス言語——これらがなければ、同じ一文がビジネスにとって、開発者にとって、そして監査にとって、' +
+    'それぞれ別の意味を持ってしまいます。' +
+    '次にレイヤリング——ヘキサゴナル、オニオン、クリーン、ポート＆アダプター、依存性逆転、' +
+    '関心の分離、凝集度と結合度——これはそのまま統合スタイルの決定につながります。' +
+    'モジュラーモノリス、SOA、マイクロサービス、サーバーレス、あるいはモジュリス、' +
+    'レガシーを包むストラングラーフィグ、外部システムとの境界に位置する腐敗防止層。' +
+    'さらにフロー——同期の REST と gRPC 対 非同期イベント、コレオグラフィ 対 オーケストレーション、' +
+    'サーガ、アウトボックス、インボックス、冪等性、exactly-once、at-least-once、ポイズンメッセージ、' +
+    'デッドレターキュー、バックプレッシャー、サーキットブレーカー、バルクヘッド、' +
+    '指数バックオフとジッターを伴うリトライ、レートリミット、トークンバケット。' +
+    'そのすべての上に CAP と PACELC が吊り下がっています。一貫性、可用性、分断耐性、レイテンシ——' +
+    'さらに ACID 対 BASE、結果整合性、read-your-writes、読み取り側の CQRS、信頼の源としての' +
+    'イベントソーシング、スナップショットとプロジェクション。' +
+    'データも忘れてはいけません。データメッシュ、データファブリック、レイクハウス、' +
+    'メダリオンアーキテクチャ、ラムダとカッパ、ゴールデンソース、システムオブレコード、' +
+    'マスターデータ管理、データリネージ、データコントラクト、スキーマレジストリ、バックフィル。' +
+    'その上にプラットフォーム。Twelve-Factor、コンテナ化、Kubernetes、オペレーター、' +
+    'サービスメッシュ、Istio、Envoy、サイドカー、API ゲートウェイ、BFF、サービスディスカバリ、' +
+    'プラットフォームエンジニアリング、Internal Developer Platform、GitOps、IaC、Terraform、' +
+    'Pulumi、ゴールデンパス、サービスカタログ、Backstage、FinOps。' +
+    'さらに品質とリスク——SOLID、DRY、KISS、YAGNI、フィットネス関数、進化的アーキテクチャ、' +
+    'アーキテクチャ決定記録、技術的負債の象限、テストピラミッド、コントラクトテスト、' +
+    'カオスエンジニアリング、メトリクス・ログ・トレースとしての可観測性、OpenTelemetry、' +
+    'ゴールデンシグナル、RED と USE、DORA、SLI、SLO、SLA、エラーバジェット、バーンレート。' +
+    'そして人——コンウェイの法則、Team Topologies、ストリームアラインド、プラットフォーム、' +
+    'イネイブリング、複雑サブシステムチーム、認知負荷、ダンバー数、ワードレイマッピング、' +
+    'Cynefin、OODA、VUCA、不確実性下の意思決定。' +
+    'そしてガバナンス——TOGAF、Zachman、ArchiMate、DoDAF、FEAF、C4、4+1 モデル、' +
+    'ケイパビリティマップ、ロードマップ、ポートフォリオ、ゼロトラスト、多層防御、最小権限、' +
+    'STRIDE、シフトレフト、SBOM、サプライチェーンセキュリティ。',
+};
+
+const MONOLOGUE: Record<Language, Phrase> = {
+  pl: {
+    base: MONOLOGUE_BODY.pl + ASK_BACK.pl,
+    variant: MONOLOGUE_BODY.pl + MONOLOGUE_CODA.pl + ASK_BACK.pl,
+  },
+  en: {
+    base: MONOLOGUE_BODY.en + ASK_BACK.en,
+    variant: MONOLOGUE_BODY.en + MONOLOGUE_CODA.en + ASK_BACK.en,
+  },
+  de: {
+    base: MONOLOGUE_BODY.de + ASK_BACK.de,
+    variant: MONOLOGUE_BODY.de + MONOLOGUE_CODA.de + ASK_BACK.de,
+  },
+  ja: {
+    base: MONOLOGUE_BODY.ja + ASK_BACK.ja,
+    variant: MONOLOGUE_BODY.ja + MONOLOGUE_CODA.ja + ASK_BACK.ja,
+  },
+};
 
 const PHRASES: Record<AnswerKind, Record<Language, Phrase>> = {
   depends: {
@@ -315,6 +500,7 @@ const PHRASES: Record<AnswerKind, Record<Language, Phrase>> = {
         'まず技術スパイクをやって、結果を持ち帰りましょう。2週間の静けさを買えて、その後どうせ違うやり方をしますからね。',
     },
   },
+  monologue: MONOLOGUE,
 };
 
 /** Pattern chips surfaced per kind (proper nouns — language-independent). */
@@ -329,6 +515,18 @@ const PATTERNS_BY_KIND: Record<AnswerKind, string[]> = {
   slo: ['SLI', 'SLO', 'Error Budget'],
   workshop: ['Workshop', 'Ticket', 'Backlog'],
   spike: ['Spike', 'PoC', 'Timebox'],
+  monologue: [
+    'TOGAF',
+    'Zachman',
+    'ArchiMate',
+    'C4',
+    'DDD',
+    'CQRS',
+    'Event Sourcing',
+    'Team Topologies',
+    'Cynefin',
+    'FinOps',
+  ],
 };
 
 const CONSIDERATIONS: Record<Language, string[]> = {

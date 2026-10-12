@@ -3,10 +3,11 @@
 > The enterprise-grade AI powployed platform that answers **every** architecture question
 > with complete, unwavering confidence.
 
-**Request in. Decisive answer out.** Every question is answered with one of ten
+**Request in. Decisive answer out.** Every question is answered with one of eleven
 classic architect non-answers — from _"To zależy"_ and _"Have we considered
-event-driven architecture?"_ to _"Let's do a spike and come back with findings."_
-Each archetype ships a cynical variant that shows up less often.
+event-driven architecture?"_ to _"Let's do a spike and come back with findings"_ and
+a two-thousand-character architecture lecture that never gets to the point. Each
+archetype ships a cynical variant that shows up less often.
 
 Supports **Polish, English, German and Japanese**. No database. Runs in Docker.
 
@@ -24,6 +25,7 @@ Supports **Polish, English, German and Japanese**. No database. Runs in Docker.
 | `slo`            | reliability          | _zdefiniować SLI/SLO_ → _…ładne metryki jak deploy się sypie_ |
 | `workshop`       | process              | _Musimy umówić warsztat_ → _…co omówimy na kolejnym warsztacie_ |
 | `spike`          | discovery            | _spike i wróćmy z wnioskami_ → _…kupimy dwa tygodnie ciszy_ |
+| `monologue`      | the long way round   | _~2,000-char wywód o TOGAF/CQRS/DDD… kończący się „A właściwie o co mnie pytałeś?"_ → _…a i tak nikt tego nie przeczyta do końca_ |
 
 Distribution is configurable (see the two `ARCHITECT_*` variables below).
 
