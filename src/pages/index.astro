@@ -1,0 +1,1001 @@
+---
+import Layout from '../layouts/Layout.astro';
+import { LANGUAGE_LIST } from '../lib/architect';
+---
+
+<Layout>
+	<div class="aas-bg" aria-hidden="true">
+		<div class="aas-aurora aas-aurora--1"></div>
+		<div class="aas-aurora aas-aurora--2"></div>
+		<div class="aas-aurora aas-aurora--3"></div>
+		<div class="aas-bggrid"></div>
+	</div>
+
+	<header class="aas-topbar">
+		<div class="aas-brand">
+			<span class="aas-logo">◈</span>
+			<span class="aas-brand-name">ARCHITECT<em>.AI</em></span>
+			<span class="aas-badge">ENTERPRISE</span>
+		</div>
+		<nav class="aas-pills">
+			<span class="aas-pill"><i class="aas-dot"></i>99.99% uptime</span>
+			<span class="aas-pill">v4.2.0-enterprise</span>
+			<span class="aas-pill">SOC 2 · ISO 27001</span>
+		</nav>
+	</header>
+
+	<main class="aas-main">
+		<section class="aas-hero">
+			<span class="aas-eyebrow">ENTERPRISE ARCHITECTURE INTELLIGENCE PLATFORM</span>
+			<h1>
+				Stop guessing.<br />
+				<span class="aas-grad">Get the definitive answer.</span>
+			</h1>
+			<p class="aas-sub">
+				Describe your architectural challenge. The ARCHITECT.AI reasoning engine evaluates your
+				context against 4,096 enterprise patterns and returns a decisive, board-ready
+				recommendation in milliseconds.
+			</p>
+			<div class="aas-stats">
+				<div class="aas-stat">
+					<span class="aas-stat-value">4,096</span>
+					<span class="aas-stat-label">Patterns indexed</span>
+				</div>
+				<div class="aas-stat">
+					<span class="aas-stat-value">1.2<small>ms</small></span>
+					<span class="aas-stat-label">p50 latency</span>
+				</div>
+				<div class="aas-stat">
+					<span class="aas-stat-value">99.99<small>%</small></span>
+					<span class="aas-stat-label">Uptime SLA</span>
+				</div>
+				<div class="aas-stat">
+					<span class="aas-stat-value">12<small>M+</small></span>
+					<span class="aas-stat-label">Decisions served</span>
+				</div>
+			</div>
+		</section>
+
+		<section class="aas-panel aas-input">
+			<div class="aas-panel-head">
+				<span class="aas-panel-title">Architecture Query</span>
+				<span class="aas-panel-meta" id="lang-meta">Response language: Polski 🇵🇱</span>
+			</div>
+
+			<div class="aas-langs" role="group" aria-label="Response language">
+				{
+					LANGUAGE_LIST.map((lang) => (
+						<button
+							type="button"
+							class:list={['aas-lang', { 'is-active': lang.code === 'pl' }]}
+							data-lang={lang.code}
+						>
+							<span aria-hidden="true">{lang.flag}</span> {lang.label}
+						</button>
+					))
+				}
+			</div>
+
+			<textarea
+				id="query"
+				class="aas-textarea"
+				rows="3"
+				maxlength="2000"
+				placeholder="e.g. Should we split our monolith into microservices before the next funding round?"
+			></textarea>
+
+			<div class="aas-actions">
+				<span class="aas-hint">⌘ / Ctrl + ↵ to run analysis</span>
+				<button type="button" id="run" class="aas-run">
+					<span class="aas-run-label">Run Analysis</span>
+					<span class="aas-run-spinner" aria-hidden="true"></span>
+				</button>
+			</div>
+			<p class="aas-error" id="error" role="alert" hidden></p>
+		</section>
+
+		<section class="aas-panel aas-thinking" id="thinking" hidden>
+			<div class="aas-thinking-head">
+				<span class="aas-thinking-pulse" aria-hidden="true"></span>
+				<span>Reasoning engine active</span>
+			</div>
+			<ul class="aas-steps" id="steps">
+				<li data-step>Tokenizing architectural query</li>
+				<li data-step>Loading 4,096 enterprise patterns</li>
+				<li data-step>Evaluating trade-offs · CAP · coupling · cohesion</li>
+				<li data-step>Synthesizing canonical recommendation</li>
+			</ul>
+		</section>
+
+		<section class="aas-panel aas-response" id="response" hidden>
+			<div class="aas-resp-head">
+				<span class="aas-kind" id="kind">Canonical Answer</span>
+				<span class="aas-req" id="req"></span>
+			</div>
+
+			<div class="aas-answer-wrap">
+				<p class="aas-answer" id="answer"></p>
+			</div>
+
+			<div class="aas-grid" id="metrics"></div>
+
+			<div class="aas-chips" id="patterns"></div>
+
+			<ul class="aas-considerations" id="considerations"></ul>
+
+			<details class="aas-raw">
+				<summary>Raw response payload</summary>
+				<pre id="raw"></pre>
+			</details>
+		</section>
+	</main>
+
+	<footer class="aas-footer">
+		<span>ARCHITECT.AI · Enterprise Architecture Intelligence</span>
+		<span>Powered by the ARCH-4o reasoning engine · <a href="/api/health">API status</a></span>
+	</footer>
+
+	<script>
+		const LANG_LABELS: Record<string, string> = {
+			pl: 'Polski 🇵🇱',
+			en: 'English 🇬🇧',
+			de: 'Deutsch 🇩🇪',
+			ja: '日本語 🇯🇵',
+		};
+
+		let language = 'pl';
+
+		const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
+		const query = $<HTMLTextAreaElement>('query');
+		const runBtn = $<HTMLButtonElement>('run');
+		const errorEl = $<HTMLParagraphElement>('error');
+		const thinking = $<HTMLElement>('thinking');
+		const response = $<HTMLElement>('response');
+		const answerEl = $<HTMLParagraphElement>('answer');
+		const kindEl = $<HTMLElement>('kind');
+		const reqEl = $<HTMLElement>('req');
+		const metricsEl = $<HTMLElement>('metrics');
+		const patternsEl = $<HTMLElement>('patterns');
+		const considerationsEl = $<HTMLUListElement>('considerations');
+		const rawEl = $<HTMLElement>('raw');
+		const langMeta = $<HTMLElement>('lang-meta');
+
+		document.querySelectorAll<HTMLButtonElement>('.aas-lang').forEach((btn) => {
+			btn.addEventListener('click', () => {
+				language = btn.dataset.lang || 'pl';
+				document
+					.querySelectorAll('.aas-lang')
+					.forEach((b) => b.classList.toggle('is-active', b === btn));
+				langMeta.textContent = `Response language: ${LANG_LABELS[language]}`;
+			});
+		});
+
+		runBtn.addEventListener('click', run);
+		query.addEventListener('keydown', (e) => {
+			if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+				e.preventDefault();
+				void run();
+			}
+		});
+
+		function typeOut(el: HTMLElement, text: string): Promise<void> {
+			return new Promise((resolve) => {
+				el.textContent = '';
+				el.classList.add('is-typing');
+				const perTick = Math.max(1, Math.ceil(text.length / 90));
+				const interval = Math.max(8, Math.min(28, 1400 / Math.max(1, text.length / perTick)));
+				let i = 0;
+				const timer = window.setInterval(() => {
+					i += perTick;
+					el.textContent = text.slice(0, i);
+					if (i >= text.length) {
+						window.clearInterval(timer);
+						el.textContent = text;
+						el.classList.remove('is-typing');
+						resolve();
+					}
+				}, interval);
+			});
+		}
+
+		async function animateSteps() {
+			const steps = Array.from(document.querySelectorAll<HTMLLIElement>('#steps li'));
+			steps.forEach((s) => s.classList.remove('is-active', 'is-done'));
+			for (const step of steps) {
+				step.classList.add('is-active');
+				await new Promise((r) => window.setTimeout(r, 240));
+				step.classList.remove('is-active');
+				step.classList.add('is-done');
+			}
+		}
+
+		function renderMetrics(data: Record<string, unknown>) {
+			const items: Array<[string, string]> = [
+				['Confidence', `${Math.round((data.confidence as number) * 100)}%`],
+				['Processing', `${data.processingTimeMs} ms`],
+				['Model', String(data.model)],
+				['Tokens', `${data.tokensIn} → ${data.tokensOut}`],
+			];
+			metricsEl.innerHTML = items
+				.map(
+					([label, value]) =>
+						`<div class="aas-metric"><span class="aas-metric-label">${label}</span><span class="aas-metric-value">${value}</span></div>`,
+				)
+				.join('');
+		}
+
+		async function run() {
+			const question = query.value.trim();
+			errorEl.hidden = true;
+			if (!question) {
+				errorEl.textContent = 'Please enter an architectural question.';
+				errorEl.hidden = false;
+				query.focus();
+				return;
+			}
+
+			runBtn.classList.add('is-loading');
+			runBtn.disabled = true;
+			response.hidden = true;
+			thinking.hidden = false;
+
+			const [data] = await Promise.all([
+				fetch('/api/ask', {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({ question, language }),
+				})
+					.then(async (res) => {
+						const body = await res.json();
+						if (!res.ok) throw new Error(body?.message || 'Request failed');
+						return body;
+					})
+					.catch((err: Error) => ({ __error: err.message })),
+				animateSteps(),
+			]);
+
+			thinking.hidden = true;
+			runBtn.classList.remove('is-loading');
+			runBtn.disabled = false;
+
+			if (data && data.__error) {
+				errorEl.textContent = data.__error;
+				errorEl.hidden = false;
+				return;
+			}
+
+			kindEl.textContent = data.kindLabel;
+			kindEl.className = `aas-kind aas-kind--${data.kind}`;
+			reqEl.textContent = `${data.requestId.slice(0, 8)} · ${data.languageLabel}${data.usedVariant ? ' · variant' : ''}`;
+			renderMetrics(data);
+
+			patternsEl.innerHTML = (data.patternsDetected as string[])
+				.map((p) => `<span class="aas-chip">${p}</span>`)
+				.join('');
+
+			considerationsEl.innerHTML = (data.considerations as string[])
+				.map((c) => `<li>${c}</li>`)
+				.join('');
+
+			rawEl.textContent = JSON.stringify(data, null, 2);
+
+			response.hidden = false;
+			response.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+			await typeOut(answerEl, data.answer);
+		}
+	</script>
+
+	<style is:global>
+		/* ============ Background ============ */
+		.aas-bg {
+			position: fixed;
+			inset: 0;
+			z-index: -1;
+			overflow: hidden;
+			background:
+				radial-gradient(1200px 600px at 50% -10%, rgba(99, 102, 241, 0.18), transparent 60%),
+				#05060a;
+		}
+
+		.aas-aurora {
+			position: absolute;
+			width: 42vw;
+			height: 42vw;
+			border-radius: 50%;
+			filter: blur(90px);
+			opacity: 0.35;
+			animation: aas-float 18s ease-in-out infinite;
+		}
+
+		.aas-aurora--1 {
+			top: -12vw;
+			left: -8vw;
+			background: #6366f1;
+		}
+		.aas-aurora--2 {
+			top: 10vw;
+			right: -12vw;
+			background: #a855f7;
+			animation-delay: -6s;
+		}
+		.aas-aurora--3 {
+			bottom: -18vw;
+			left: 28vw;
+			background: #22d3ee;
+			opacity: 0.2;
+			animation-delay: -12s;
+		}
+
+		.aas-bggrid {
+			position: absolute;
+			inset: 0;
+			background-image:
+				linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+				linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+			background-size: 48px 48px;
+			mask-image: radial-gradient(circle at 50% 30%, black, transparent 75%);
+		}
+
+		@keyframes aas-float {
+			0%,
+			100% {
+				transform: translate3d(0, 0, 0) scale(1);
+			}
+			50% {
+				transform: translate3d(3vw, 4vw, 0) scale(1.12);
+			}
+		}
+
+		/* ============ Layout ============ */
+		.aas-topbar {
+			position: sticky;
+			top: 0;
+			z-index: 20;
+			display: flex;
+			align-items: center;
+			justify-content: space-between;
+			gap: 16px;
+			padding: 14px clamp(16px, 4vw, 48px);
+			backdrop-filter: blur(14px);
+			background: rgba(5, 6, 10, 0.6);
+			border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+		}
+
+		.aas-brand {
+			display: flex;
+			align-items: center;
+			gap: 10px;
+			font-weight: 700;
+			letter-spacing: 0.06em;
+		}
+
+		.aas-logo {
+			display: grid;
+			place-items: center;
+			width: 30px;
+			height: 30px;
+			border-radius: 9px;
+			background: linear-gradient(135deg, #6366f1, #a855f7 55%, #22d3ee);
+			color: #fff;
+			font-size: 15px;
+			box-shadow: 0 0 24px rgba(99, 102, 241, 0.55);
+		}
+
+		.aas-brand-name em {
+			font-style: normal;
+			background: linear-gradient(90deg, #818cf8, #22d3ee);
+			-webkit-background-clip: text;
+			background-clip: text;
+			color: transparent;
+		}
+
+		.aas-badge {
+			font-size: 10px;
+			letter-spacing: 0.16em;
+			padding: 4px 8px;
+			border-radius: 999px;
+			border: 1px solid rgba(129, 140, 248, 0.5);
+			color: #a5b4fc;
+			background: rgba(99, 102, 241, 0.12);
+		}
+
+		.aas-pills {
+			display: flex;
+			gap: 8px;
+			flex-wrap: wrap;
+			justify-content: flex-end;
+		}
+
+		.aas-pill {
+			display: inline-flex;
+			align-items: center;
+			gap: 6px;
+			font-size: 12px;
+			color: #8b93a7;
+			padding: 5px 10px;
+			border-radius: 999px;
+			border: 1px solid rgba(255, 255, 255, 0.08);
+			background: rgba(255, 255, 255, 0.03);
+		}
+
+		.aas-dot {
+			width: 7px;
+			height: 7px;
+			border-radius: 50%;
+			background: #34d399;
+			box-shadow: 0 0 10px #34d399;
+		}
+
+		.aas-main {
+			width: min(920px, 100%);
+			margin: 0 auto;
+			padding: clamp(32px, 6vw, 72px) clamp(16px, 4vw, 32px) 64px;
+			display: flex;
+			flex-direction: column;
+			gap: 22px;
+			min-width: 0;
+		}
+
+		/* ============ Hero ============ */
+		.aas-hero {
+			text-align: center;
+			display: flex;
+			flex-direction: column;
+			align-items: center;
+			gap: 16px;
+		}
+
+		.aas-eyebrow {
+			font-size: 11px;
+			letter-spacing: 0.22em;
+			color: #818cf8;
+			text-transform: uppercase;
+		}
+
+		.aas-hero h1 {
+			font-size: clamp(30px, 6vw, 54px);
+			line-height: 1.05;
+			letter-spacing: -0.03em;
+			margin: 0;
+			font-weight: 800;
+		}
+
+		.aas-grad {
+			background: linear-gradient(90deg, #818cf8, #a855f7 45%, #22d3ee);
+			-webkit-background-clip: text;
+			background-clip: text;
+			color: transparent;
+		}
+
+		.aas-sub {
+			max-width: 620px;
+			margin: 0;
+			color: #8b93a7;
+			font-size: 16px;
+			line-height: 1.6;
+		}
+
+		.aas-stats {
+			display: grid;
+			grid-template-columns: repeat(4, minmax(0, 1fr));
+			gap: 12px;
+			width: 100%;
+			margin-top: 12px;
+		}
+
+		.aas-stat {
+			display: flex;
+			flex-direction: column;
+			gap: 4px;
+			padding: 14px;
+			border-radius: 14px;
+			border: 1px solid rgba(255, 255, 255, 0.07);
+			background: rgba(255, 255, 255, 0.025);
+		}
+
+		.aas-stat-value {
+			font-size: 22px;
+			font-weight: 700;
+			font-variant-numeric: tabular-nums;
+		}
+
+		.aas-stat-value small {
+			font-size: 12px;
+			color: #8b93a7;
+			margin-left: 1px;
+		}
+
+		.aas-stat-label {
+			font-size: 11px;
+			letter-spacing: 0.08em;
+			text-transform: uppercase;
+			color: #6b7280;
+		}
+
+		/* ============ Panels ============ */
+		.aas-panel {
+			border-radius: 18px;
+			border: 1px solid rgba(255, 255, 255, 0.08);
+			background: linear-gradient(180deg, rgba(21, 25, 44, 0.72), rgba(11, 13, 24, 0.72));
+			box-shadow: 0 24px 60px -30px rgba(0, 0, 0, 0.9);
+			padding: clamp(16px, 3vw, 24px);
+			min-width: 0;
+			backdrop-filter: blur(12px);
+		}
+
+		.aas-panel-head {
+			display: flex;
+			align-items: center;
+			justify-content: space-between;
+			gap: 12px;
+			margin-bottom: 14px;
+			flex-wrap: wrap;
+		}
+
+		.aas-panel-title {
+			font-weight: 600;
+			letter-spacing: 0.02em;
+		}
+
+		.aas-panel-meta {
+			font-size: 12px;
+			color: #8b93a7;
+		}
+
+		/* ============ Language selector ============ */
+		.aas-langs {
+			display: flex;
+			gap: 8px;
+			flex-wrap: wrap;
+			margin-bottom: 14px;
+		}
+
+		.aas-lang {
+			cursor: pointer;
+			font: inherit;
+			font-size: 13px;
+			color: #c7ccd9;
+			padding: 7px 12px;
+			border-radius: 10px;
+			border: 1px solid rgba(255, 255, 255, 0.1);
+			background: rgba(255, 255, 255, 0.03);
+			transition:
+				border-color 0.2s,
+				background 0.2s,
+				color 0.2s,
+				transform 0.1s;
+		}
+
+		.aas-lang:hover {
+			border-color: rgba(129, 140, 248, 0.55);
+			transform: translateY(-1px);
+		}
+
+		.aas-lang.is-active {
+			color: #fff;
+			border-color: transparent;
+			background: linear-gradient(135deg, #6366f1, #a855f7 60%, #22d3ee);
+			box-shadow: 0 8px 24px -10px rgba(99, 102, 241, 0.9);
+		}
+
+		/* ============ Input ============ */
+		.aas-textarea {
+			width: 100%;
+			resize: vertical;
+			min-height: 92px;
+			font: inherit;
+			font-size: 15px;
+			line-height: 1.55;
+			color: #e8ecf5;
+			padding: 14px 16px;
+			border-radius: 14px;
+			border: 1px solid rgba(255, 255, 255, 0.1);
+			background: rgba(2, 3, 8, 0.6);
+			outline: none;
+			transition:
+				border-color 0.2s,
+				box-shadow 0.2s;
+		}
+
+		.aas-textarea::placeholder {
+			color: #565f73;
+		}
+
+		.aas-textarea:focus {
+			border-color: rgba(129, 140, 248, 0.7);
+			box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.16);
+		}
+
+		.aas-actions {
+			display: flex;
+			align-items: center;
+			justify-content: space-between;
+			gap: 12px;
+			margin-top: 14px;
+			flex-wrap: wrap;
+		}
+
+		.aas-hint {
+			font-size: 12px;
+			color: #6b7280;
+		}
+
+		.aas-run {
+			position: relative;
+			cursor: pointer;
+			font: inherit;
+			font-weight: 600;
+			font-size: 14px;
+			letter-spacing: 0.02em;
+			color: #fff;
+			padding: 12px 22px;
+			border: none;
+			border-radius: 12px;
+			background: linear-gradient(135deg, #6366f1, #a855f7 60%, #22d3ee);
+			box-shadow: 0 14px 34px -14px rgba(99, 102, 241, 0.95);
+			transition:
+				transform 0.12s,
+				box-shadow 0.2s,
+				opacity 0.2s;
+		}
+
+		.aas-run:hover:not(:disabled) {
+			transform: translateY(-1px);
+			box-shadow: 0 18px 40px -14px rgba(168, 85, 247, 0.95);
+		}
+
+		.aas-run:disabled {
+			cursor: progress;
+			opacity: 0.75;
+		}
+
+		.aas-run-spinner {
+			display: none;
+			width: 15px;
+			height: 15px;
+			margin-left: 8px;
+			border-radius: 50%;
+			border: 2px solid rgba(255, 255, 255, 0.4);
+			border-top-color: #fff;
+			animation: aas-spin 0.7s linear infinite;
+			vertical-align: -2px;
+		}
+
+		.aas-run.is-loading .aas-run-spinner {
+			display: inline-block;
+		}
+
+		@keyframes aas-spin {
+			to {
+				transform: rotate(360deg);
+			}
+		}
+
+		.aas-error {
+			margin: 12px 0 0;
+			font-size: 13px;
+			color: #fca5a5;
+			background: rgba(248, 113, 113, 0.1);
+			border: 1px solid rgba(248, 113, 113, 0.3);
+			border-radius: 10px;
+			padding: 10px 12px;
+		}
+
+		/* ============ Thinking ============ */
+		.aas-thinking-head {
+			display: flex;
+			align-items: center;
+			gap: 10px;
+			font-size: 13px;
+			letter-spacing: 0.06em;
+			text-transform: uppercase;
+			color: #a5b4fc;
+			margin-bottom: 12px;
+		}
+
+		.aas-thinking-pulse {
+			width: 9px;
+			height: 9px;
+			border-radius: 50%;
+			background: #22d3ee;
+			box-shadow: 0 0 0 0 rgba(34, 211, 238, 0.6);
+			animation: aas-pulse 1.4s infinite;
+		}
+
+		@keyframes aas-pulse {
+			70% {
+				box-shadow: 0 0 0 12px rgba(34, 211, 238, 0);
+			}
+			100% {
+				box-shadow: 0 0 0 0 rgba(34, 211, 238, 0);
+			}
+		}
+
+		.aas-steps {
+			list-style: none;
+			margin: 0;
+			padding: 0;
+			display: flex;
+			flex-direction: column;
+			gap: 8px;
+			font-size: 14px;
+			color: #6b7280;
+		}
+
+		.aas-steps li {
+			display: flex;
+			align-items: center;
+			gap: 10px;
+			transition: color 0.2s;
+		}
+
+		.aas-steps li::before {
+			content: '○';
+			color: #4b5563;
+			font-size: 12px;
+		}
+
+		.aas-steps li.is-active {
+			color: #e8ecf5;
+		}
+
+		.aas-steps li.is-active::before {
+			content: '◍';
+			color: #22d3ee;
+			animation: aas-spin 1.2s linear infinite;
+		}
+
+		.aas-steps li.is-done {
+			color: #8b93a7;
+		}
+
+		.aas-steps li.is-done::before {
+			content: '✓';
+			color: #34d399;
+		}
+
+		/* ============ Response ============ */
+		.aas-resp-head {
+			display: flex;
+			align-items: center;
+			justify-content: space-between;
+			gap: 8px 12px;
+			margin-bottom: 16px;
+			flex-wrap: wrap;
+			min-width: 0;
+		}
+
+		.aas-kind {
+			flex: 0 0 auto;
+			font-size: 11px;
+			letter-spacing: 0.14em;
+			text-transform: uppercase;
+			padding: 5px 10px;
+			border-radius: 999px;
+			border: 1px solid rgba(129, 140, 248, 0.4);
+			color: #a5b4fc;
+			background: rgba(99, 102, 241, 0.12);
+			white-space: nowrap;
+		}
+
+		.aas-kind--sponsors,
+		.aas-kind--workshop {
+			border-color: rgba(251, 191, 36, 0.45);
+			color: #fcd34d;
+			background: rgba(251, 191, 36, 0.12);
+		}
+
+		.aas-kind--archimate,
+		.aas-kind--diagrams {
+			border-color: rgba(96, 165, 250, 0.45);
+			color: #93c5fd;
+			background: rgba(96, 165, 250, 0.12);
+		}
+
+		.aas-kind--eventdriven,
+		.aas-kind--boundedcontext {
+			border-color: rgba(168, 85, 247, 0.45);
+			color: #d8b4fe;
+			background: rgba(168, 85, 247, 0.12);
+		}
+
+		.aas-kind--nfr,
+		.aas-kind--slo {
+			border-color: rgba(34, 211, 238, 0.45);
+			color: #67e8f9;
+			background: rgba(34, 211, 238, 0.12);
+		}
+
+		.aas-kind--spike {
+			border-color: rgba(52, 211, 153, 0.45);
+			color: #6ee7b7;
+			background: rgba(52, 211, 153, 0.12);
+		}
+
+		.aas-req {
+			flex: 1 1 auto;
+			min-width: 0;
+			text-align: right;
+			overflow: hidden;
+			text-overflow: ellipsis;
+			white-space: nowrap;
+			font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+			font-size: 11px;
+			color: #6b7280;
+		}
+
+		.aas-answer-wrap {
+			border-left: 2px solid rgba(129, 140, 248, 0.55);
+			padding-left: 18px;
+			margin-bottom: 22px;
+			min-width: 0;
+		}
+
+		.aas-answer {
+			margin: 0;
+			font-size: clamp(20px, 3.4vw, 30px);
+			line-height: 1.35;
+			font-weight: 600;
+			letter-spacing: -0.01em;
+			color: #f4f6fb;
+			overflow-wrap: anywhere;
+		}
+
+		.aas-answer.is-typing::after {
+			content: '▍';
+			color: #818cf8;
+			animation: aas-blink 0.9s steps(1) infinite;
+			margin-left: 2px;
+		}
+
+		@keyframes aas-blink {
+			50% {
+				opacity: 0;
+			}
+		}
+
+		.aas-grid {
+			display: grid;
+			grid-template-columns: repeat(2, minmax(0, 1fr));
+			gap: 10px;
+			margin-bottom: 16px;
+		}
+
+		.aas-metric {
+			display: flex;
+			flex-direction: column;
+			gap: 4px;
+			min-width: 0;
+			padding: 12px;
+			border-radius: 12px;
+			border: 1px solid rgba(255, 255, 255, 0.07);
+			background: rgba(2, 3, 8, 0.45);
+		}
+
+		.aas-metric-label {
+			font-size: 10px;
+			letter-spacing: 0.12em;
+			text-transform: uppercase;
+			color: #6b7280;
+		}
+
+		.aas-metric-value {
+			font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+			font-size: 14px;
+			color: #c7ccd9;
+			overflow-wrap: anywhere;
+		}
+
+		@media (min-width: 560px) {
+			.aas-grid {
+				grid-template-columns: repeat(4, minmax(0, 1fr));
+			}
+		}
+
+		.aas-chips {
+			display: flex;
+			flex-wrap: wrap;
+			gap: 8px;
+			margin-bottom: 16px;
+		}
+
+		.aas-chip {
+			font-size: 12px;
+			color: #a5b4fc;
+			padding: 5px 10px;
+			border-radius: 999px;
+			border: 1px solid rgba(129, 140, 248, 0.35);
+			background: rgba(99, 102, 241, 0.1);
+			overflow-wrap: anywhere;
+		}
+
+		.aas-considerations {
+			list-style: none;
+			margin: 0 0 16px;
+			padding: 0;
+			display: grid;
+			grid-template-columns: minmax(0, 1fr);
+			gap: 8px;
+			font-size: 13px;
+			line-height: 1.45;
+			color: #8b93a7;
+		}
+
+		.aas-considerations li {
+			display: flex;
+			align-items: flex-start;
+			gap: 8px;
+			min-width: 0;
+		}
+
+		.aas-considerations li::before {
+			content: '✓';
+			color: #34d399;
+			flex: 0 0 auto;
+		}
+
+		@media (min-width: 620px) {
+			.aas-considerations {
+				grid-template-columns: repeat(2, minmax(0, 1fr));
+			}
+		}
+
+		.aas-raw {
+			border-top: 1px solid rgba(255, 255, 255, 0.07);
+			padding-top: 14px;
+			font-size: 13px;
+			color: #8b93a7;
+		}
+
+		.aas-raw summary {
+			cursor: pointer;
+			user-select: none;
+		}
+
+		.aas-raw pre {
+			margin: 12px 0 0;
+			padding: 14px;
+			border-radius: 12px;
+			background: rgba(2, 3, 8, 0.7);
+			border: 1px solid rgba(255, 255, 255, 0.07);
+			overflow: auto;
+			font-size: 12px;
+			line-height: 1.5;
+			color: #c7ccd9;
+		}
+
+		/* ============ Footer ============ */
+		.aas-footer {
+			display: flex;
+			align-items: center;
+			justify-content: space-between;
+			gap: 12px;
+			flex-wrap: wrap;
+			width: min(920px, 100%);
+			margin: 0 auto;
+			padding: 20px clamp(16px, 4vw, 32px) 40px;
+			font-size: 12px;
+			color: #565f73;
+			border-top: 1px solid rgba(255, 255, 255, 0.05);
+		}
+
+		.aas-footer a {
+			color: #818cf8;
+			text-decoration: none;
+		}
+
+		.aas-footer a:hover {
+			text-decoration: underline;
+		}
+
+		@media (max-width: 640px) {
+			.aas-stats {
+				grid-template-columns: repeat(2, minmax(0, 1fr));
+			}
+
+			.aas-pills {
+				display: none;
+			}
+		}
+	</style>
+</Layout>

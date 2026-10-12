@@ -1,0 +1,27 @@
+# Dependencies
+node_modules/
+
+# Astro build output
+dist/
+.astro/
+
+# 10x workflow / local context (PRD, plans, verification logs)
+context/
+
+# Local OpenCode tooling (10x skills, prompts, lockfile) — not part of the app
+.opencode/
+skills-lock.json
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
